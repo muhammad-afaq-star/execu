@@ -4,6 +4,7 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../core/utils/date_keys.dart';
+import '../../core/services/alarm_service.dart'; // ✅ Added to clean up background reminders
 
 class HabitsScreen extends StatelessWidget {
   const HabitsScreen({super.key});
@@ -94,8 +95,12 @@ class HabitsScreen extends StatelessWidget {
                         await _toggleDoneToday(habitLogsBox, id, !doneToday);
                       },
                       onDelete: () async {
+                        // ✅ Cancel background OS alarms safely before removing from local memory
+                        final alarmId = h['alarmId'] as int?;
+                        if (alarmId != null) {
+                          await AlarmService.cancelAlarm(alarmId);
+                        }
                         await habitsBox.delete(id);
-                        // (Optional) Keep logs or delete logs later
                       },
                     );
                   },
@@ -139,9 +144,7 @@ class HabitsScreen extends StatelessWidget {
   }
 
   int _streakCount(Box habitLogsBox, String habitId) {
-    // streak counts consecutive days DONE ending today if done today else ending yesterday
     final now = DateTime.now();
-    final todayKey = dateKey(now);
     final todayDone = _isDoneToday(habitLogsBox, habitId);
 
     DateTime cursor = todayDone ? now : now.subtract(const Duration(days: 1));
@@ -218,7 +221,7 @@ class _HabitCard extends StatelessWidget {
             BoxShadow(
               blurRadius: 10,
               offset: const Offset(0, 2),
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05), // ✅ Fixed modern syntax compilation mismatch
             )
           ],
         ),
