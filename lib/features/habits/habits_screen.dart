@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../core/utils/date_keys.dart';
@@ -29,10 +28,10 @@ class HabitsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: ValueListenableBuilder(
           valueListenable: habitsBox.listenable(),
-          builder: (context, _, _) {
+          builder: (context, box, _) {
             return ValueListenableBuilder(
               valueListenable: habitLogsBox.listenable(),
-              builder: (context, _, _) {
+              builder: (context, habitLogsValue, _) {
                 final habits = habitsBox.values
                     .map((e) => Map<String, dynamic>.from(e))
                     .toList();
@@ -75,7 +74,7 @@ class HabitsScreen extends StatelessWidget {
 
                 return ListView.separated(
                   itemCount: habits.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final h = habits[index];
                     final id = h['id'] as String;
@@ -221,7 +220,7 @@ class _HabitCard extends StatelessWidget {
             BoxShadow(
               blurRadius: 10,
               offset: const Offset(0, 2),
-              color: Colors.black.withOpacity(0.05), // ✅ Fixed modern syntax compilation mismatch
+              color: Colors.black.withValues(alpha: 0.05),
             )
           ],
         ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 
@@ -24,13 +23,13 @@ class InsightsScreen extends StatelessWidget {
       ),
       body: ValueListenableBuilder(
         valueListenable: inboxBox.listenable(),
-        builder: (context, _, _) {
+        builder: (context, inboxBoxValue, _) {
           return ValueListenableBuilder(
             valueListenable: habitsBox.listenable(),
-            builder: (context, _, _) {
+            builder: (context, habitsBoxValue, _) {
               return ValueListenableBuilder(
                 valueListenable: habitLogsBox.listenable(),
-                builder: (context, _, _) {
+                builder: (context, habitLogsBoxValue, _) {
                   final now = DateTime.now();
                   final weekDays = weekDaysMonSun(now); // 7 days
 

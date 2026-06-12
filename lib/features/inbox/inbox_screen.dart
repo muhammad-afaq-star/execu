@@ -32,7 +32,7 @@ class InboxScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Top input look (like screenshot) — opens bottom sheet
+            // Top input look (like screenshot) - opens bottom sheet
             InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () => _openAddSheet(context),
@@ -64,7 +64,7 @@ class InboxScreen extends StatelessWidget {
                   if (box.isEmpty) {
                     return const Center(
                       child: Text(
-                        'No items yet.\nTap “+ Add Item” to add your first one.',
+                        'No items yet.\nTap "+ Add Item" to add your first one.',
                         textAlign: TextAlign.center,
                       ),
                     );
@@ -83,7 +83,8 @@ class InboxScreen extends StatelessWidget {
 
                   return ListView.separated(
                     itemCount: items.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    separatorBuilder: (context, index) => const SizedBox(height: 10),
+
                     itemBuilder: (context, index) {
                       final item = items[index];
                       return _InboxTile(item: item);

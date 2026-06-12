@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/utils/date_keys.dart';
 import '../../core/utils/inbox_types.dart';
-import 'package:go_router/go_router.dart';
 
 
 class TodayPlanScreen extends StatelessWidget {
@@ -34,13 +32,13 @@ class TodayPlanScreen extends StatelessWidget {
 
       body: ValueListenableBuilder(
         valueListenable: inboxBox.listenable(),
-        builder: (context, _, _) {
+        builder: (context, inboxBoxValue, _) {
           return ValueListenableBuilder(
             valueListenable: habitsBox.listenable(),
-            builder: (context, _, _) {
+            builder: (context, habitsBoxValue, _) {
               return ValueListenableBuilder(
                 valueListenable: habitLogsBox.listenable(),
-                builder: (context, _, _) {
+                builder: (context, habitLogsBoxValue, _) {
                   final today = DateTime.now();
                   final todayKey = dateKey(today);
 
@@ -291,7 +289,7 @@ class _SectionCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
               ),
               const Spacer(),
-              ?trailing,
+              if (trailing != null) trailing!,
             ],
           ),
           const SizedBox(height: 10),

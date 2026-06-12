@@ -1,7 +1,6 @@
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
 
 class AlarmService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
@@ -28,6 +27,7 @@ class AlarmService {
   // This is the background isolate function that runs when the alarm fires
   @pragma('vm:entry-point')
   static Future<void> alarmCallback(int id) async {
+    // ignore: avoid_print
     print("🔥 Alarm triggered background isolate execution! ID: $id");
     await showInstantNotification(id);
   }
