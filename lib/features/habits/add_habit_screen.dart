@@ -25,6 +25,19 @@ class AlarmSettingWidget extends StatelessWidget {
         backgroundColor: Colors.red,
         textColor: Colors.white,
       );
+      // Direct the user to the system app settings to manually grant it
+      await openAppSettings();
+      return;
+    }
+
+    // 2. Check for Notification permissions (required for Android 13+ to actually see/hear the alarm)
+    if (await Permission.notification.request().isDenied) {
+      Fluttertoast.showToast(
+        msg: "⚠️ Please enable Notification permissions in settings!",
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      await openAppSettings();
       return;
     }
 

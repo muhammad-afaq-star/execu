@@ -50,4 +50,4 @@ flutter {
 dependencies {
     // ✅ Core library desugaring engine dependency required by flutter_local_notifications
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
-}git add .
+}
