@@ -6,8 +6,37 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../core/utils/date_keys.dart';
 import '../../core/services/alarm_service.dart';
 
-class HabitsScreen extends StatelessWidget {
+class HabitsScreen extends StatefulWidget {
   const HabitsScreen({super.key});
+
+  @override
+  State<HabitsScreen> createState() => _HabitsScreenState();
+}
+
+class _HabitsScreenState extends State<HabitsScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Reschedule alarms in case the time zone changed while the app was completely closed
+    AlarmService.rescheduleAllAlarms();
+    _refreshDailySummary();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Reschedule alarms in case the time zone changed while the app was in the background
+      AlarmService.rescheduleAllAlarms();
+      _refreshDailySummary();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +130,7 @@ class HabitsScreen extends StatelessWidget {
                           await AlarmService.cancelAlarm(alarmId);
                         }
                         await habitsBox.delete(id);
+                        _refreshDailySummary();
                       },
                     );
                   },
@@ -121,6 +151,21 @@ class HabitsScreen extends StatelessWidget {
 
   // ===== Business Logic Methods =====
 
+  void _refreshDailySummary() {
+    final habitsBox = Hive.box('habits');
+    final habitLogsBox = Hive.box('habitLogs');
+    
+    int total = habitsBox.length;
+    int completed = 0;
+    
+    for (var key in habitsBox.keys) {
+      if (_isDoneToday(habitLogsBox, key.toString())) {
+        completed++;
+      }
+    }
+    AlarmService.updateDailySummary(completed, total);
+  }
+
   bool _isDoneToday(Box habitLogsBox, String habitId) {
     final todayKey = dateKey(DateTime.now());
     final key = "${habitId}_$todayKey";
@@ -139,6 +184,7 @@ class HabitsScreen extends StatelessWidget {
       'done': done,
       'updatedAt': DateTime.now().toIso8601String(),
     });
+    _refreshDailySummary();
   }
 
   int _streakCount(Box habitLogsBox, String habitId) {
@@ -212,7 +258,7 @@ class _HabitCard extends StatelessWidget {
             BoxShadow(
               blurRadius: 10,
               offset: const Offset(0, 2),
-              color: Colors.black.withOpacity(0.05), // Fixed for backward compatibility support
+              color: Colors.black.withValues(alpha: 0.05), // Fixed for backward compatibility support
             )
           ],
         ),

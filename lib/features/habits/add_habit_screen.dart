@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
@@ -5,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../core/services/alarm_service.dart';
 
 class AlarmSettingWidget extends StatelessWidget {
@@ -125,6 +127,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   TimeOfDay? _reminderTime;
   String? _selectedAudioPath;
   String? _selectedAudioName;
+  bool _isTestingAlarm = false;
 
   final icons = const [
     ('book', '📚'),
@@ -142,9 +145,16 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       type: FileType.audio,
     );
     if (result != null && result.files.single.path != null) {
+      final originalPath = result.files.single.path!;
+      final fileName = result.files.single.name;
+
+      // Copy the picked file to the app's permanent document directory
+      final appDir = await getApplicationDocumentsDirectory();
+      final permanentFile = await File(originalPath).copy('${appDir.path}/$fileName');
+
       setState(() {
-        _selectedAudioPath = result.files.single.path;
-        _selectedAudioName = result.files.single.name;
+        _selectedAudioPath = permanentFile.path;
+        _selectedAudioName = fileName;
       });
     }
   }
@@ -155,7 +165,8 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
 
     final habitsBox = Hive.box('habits');
     final id = const Uuid().v4();
-    final uniqueAlarmId = id.hashCode.abs(); 
+    // Ensure the generated ID fits safely into a 32-bit signed integer (Android's native limit)
+    final uniqueAlarmId = id.hashCode.abs() % 2147483647; 
 
     String? reminderIsoString;
 
@@ -174,7 +185,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       }
 
       reminderIsoString = targetDateTime.toIso8601String();
-      await AlarmService.setAlarm(uniqueAlarmId, targetDateTime);
+      await AlarmService.setAlarm(uniqueAlarmId, targetDateTime, customTonePath: _selectedAudioPath);
     }
 
     // Save configuration parameters payload securely to local database
@@ -195,6 +206,9 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
 
   @override
   void dispose() {
+    if (_isTestingAlarm) {
+      AlarmService.cancelAlarm(8888);
+    }
     controller.dispose();
     super.dispose();
   }
@@ -278,9 +292,25 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                   style: const TextStyle(fontSize: 13),
                   overflow: TextOverflow.ellipsis,
                 ),
-                trailing: TextButton(
-                  onPressed: _pickAudioTone,
-                  child: const Text('Browse'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(
+                      onPressed: () async {
+                        if (_isTestingAlarm) {
+                          await AlarmService.cancelAlarm(8888);
+                        } else {
+                          await AlarmService.showInstantNotification(8888, audioPath: _selectedAudioPath);
+                        }
+                        setState(() => _isTestingAlarm = !_isTestingAlarm);
+                      },
+                      child: Text(_isTestingAlarm ? 'Stop' : 'Test'),
+                    ),
+                    TextButton(
+                      onPressed: _pickAudioTone,
+                      child: const Text('Browse'),
+                    ),
+                  ],
                 ),
               ),
             ),
