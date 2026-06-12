@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../core/utils/date_keys.dart';
-import '../../core/services/alarm_service.dart'; // ✅ Added to clean up background reminders
+import '../../core/services/alarm_service.dart';
 
 class HabitsScreen extends StatelessWidget {
   const HabitsScreen({super.key});
@@ -28,7 +29,7 @@ class HabitsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: ValueListenableBuilder(
           valueListenable: habitsBox.listenable(),
-          builder: (context, box, _) {
+          builder: (context, habitsBoxValue, _) {
             return ValueListenableBuilder(
               valueListenable: habitLogsBox.listenable(),
               builder: (context, habitLogsValue, _) {
@@ -65,7 +66,7 @@ class HabitsScreen extends StatelessWidget {
                   );
                 }
 
-                // Sort by createdAt
+                // Sort by creation timeline
                 habits.sort((a, b) {
                   final da = DateTime.tryParse(a['createdAt'] ?? '') ?? DateTime(0);
                   final db = DateTime.tryParse(b['createdAt'] ?? '') ?? DateTime(0);
@@ -89,12 +90,12 @@ class HabitsScreen extends StatelessWidget {
                       iconKey: iconKey,
                       doneToday: doneToday,
                       streak: streak,
-                      fire: streak, // MVP: fire = streak
+                      fire: streak, 
                       onToggleDoneToday: () async {
                         await _toggleDoneToday(habitLogsBox, id, !doneToday);
                       },
                       onDelete: () async {
-                        // ✅ Cancel background OS alarms safely before removing from local memory
+                        // Cancel background system reminders before removing them from local database memory
                         final alarmId = h['alarmId'] as int?;
                         if (alarmId != null) {
                           await AlarmService.cancelAlarm(alarmId);
@@ -109,8 +110,6 @@ class HabitsScreen extends StatelessWidget {
           },
         ),
       ),
-
-      // Bottom add button (like UI)
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: const Color(0xFF1976D2),
         onPressed: () => context.go('/addHabit'),
@@ -120,7 +119,7 @@ class HabitsScreen extends StatelessWidget {
     );
   }
 
-  // ===== Logic =====
+  // ===== Business Logic Methods =====
 
   bool _isDoneToday(Box habitLogsBox, String habitId) {
     final todayKey = dateKey(DateTime.now());
@@ -165,7 +164,7 @@ class HabitsScreen extends StatelessWidget {
   }
 }
 
-// ===== UI Card =====
+// ===== Structural Component Card =====
 
 class _HabitCard extends StatelessWidget {
   final String name;
@@ -188,20 +187,13 @@ class _HabitCard extends StatelessWidget {
 
   String _emoji(String key) {
     switch (key) {
-      case 'book':
-        return '📚';
-      case 'run':
-        return '🏃';
-      case 'moon':
-        return '🌙';
-      case 'water':
-        return '💧';
-      case 'study':
-        return '🧠';
-      case 'gym':
-        return '🏋️';
-      default:
-        return '✅';
+      case 'book': return '📚';
+      case 'run': return '🏃';
+      case 'moon': return '🌙';
+      case 'water': return '💧';
+      case 'study': return '🧠';
+      case 'gym': return '🏋️';
+      default: return '✅';
     }
   }
 
@@ -220,13 +212,12 @@ class _HabitCard extends StatelessWidget {
             BoxShadow(
               blurRadius: 10,
               offset: const Offset(0, 2),
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05), // Fixed for backward compatibility support
             )
           ],
         ),
         child: Row(
           children: [
-            // icon bubble
             Container(
               width: 44,
               height: 44,
@@ -238,8 +229,6 @@ class _HabitCard extends StatelessWidget {
               child: Text(_emoji(iconKey), style: const TextStyle(fontSize: 22)),
             ),
             const SizedBox(width: 12),
-
-            // main
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,8 +245,6 @@ class _HabitCard extends StatelessWidget {
                 ],
               ),
             ),
-
-            // fire score
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
@@ -270,15 +257,11 @@ class _HabitCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-
-            // done today indicator
             Icon(
               doneToday ? Icons.check_circle : Icons.radio_button_unchecked,
               color: doneToday ? const Color(0xFF2E7D32) : Colors.grey,
             ),
             const SizedBox(width: 6),
-
-            // delete
             IconButton(
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline),

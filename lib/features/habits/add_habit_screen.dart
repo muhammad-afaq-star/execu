@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../core/services/alarm_service.dart';
 
 class AlarmSettingWidget extends StatelessWidget {
@@ -15,43 +18,81 @@ class AlarmSettingWidget extends StatelessWidget {
   });
 
   Future<void> _pickTime(BuildContext context) async {
+    // 1. Check for precise Android hardware alarm permissions
+    if (await Permission.scheduleExactAlarm.request().isDenied) {
+      Fluttertoast.showToast(
+        msg: "⚠️ Please enable Alarm permissions in settings!",
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: selectedTime ?? TimeOfDay.now(),
     );
-    if (!context.mounted) return;
+    
     if (picked != null) {
       onTimePicked(picked);
+
+      final now = DateTime.now();
+      var targetDateTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        picked.hour,
+        picked.minute,
+      );
+
+      if (targetDateTime.isBefore(now)) {
+        targetDateTime = targetDateTime.add(const Duration(days: 1));
+      }
+
+      // Calculate the explicit remaining time window
+      final difference = targetDateTime.difference(now);
+      final hours = difference.inHours;
+      final minutes = difference.inMinutes % 60;
+
+      String timeWindowStr = hours > 0 
+          ? "in $hours hr $minutes mins" 
+          : "in $minutes minutes";
+
+      // Display the dynamic remaining-time success toast message
+      Fluttertoast.showToast(
+        msg: "⏰ Alarm Set: ${picked.format(context)} ($timeWindowStr)",
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: const Color(0xFF1976D2),
+        textColor: Colors.white,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: 6),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: Colors.grey.shade300),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: const Icon(Icons.alarm, color: Color(0xFF1976D2)),
         title: Text(
           selectedTime == null
               ? 'Set Reminder Alarm'
               : 'Alarm Set For: ${selectedTime!.format(context)}',
-          style: const TextStyle(fontWeight: FontWeight.w500),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         ),
         trailing: ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: selectedTime == null ? const Color(0xFF1976D2) : Colors.grey.shade200,
-            foregroundColor: selectedTime == null ? Colors.white : Colors.black87,
-            elevation: 0,
+            backgroundColor: const Color(0xFF1976D2),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
           onPressed: () => _pickTime(context),
-          child: Text(selectedTime == null ? 'Pick Time' : 'Change'),
+          child: const Text('Pick Time', style: TextStyle(color: Colors.white)),
         ),
       ),
     );
@@ -69,6 +110,8 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   final controller = TextEditingController();
   String iconKey = 'check';
   TimeOfDay? _reminderTime;
+  String? _selectedAudioPath;
+  String? _selectedAudioName;
 
   final icons = const [
     ('book', '📚'),
@@ -80,15 +123,25 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     ('check', '✅'),
   ];
 
+  // Open native system file picker to select an audio file from gallery/storage
+  Future<void> _pickAudioTone() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.audio,
+    );
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        _selectedAudioPath = result.files.single.path;
+        _selectedAudioName = result.files.single.name;
+      });
+    }
+  }
+
   Future<void> _save() async {
     final name = controller.text.trim();
     if (name.isEmpty) return;
 
     final habitsBox = Hive.box('habits');
     final id = const Uuid().v4();
-    
-    // We generate a deterministic integer ID out of the UUID string hash code
-    // to map this specific habit entity safely with the Android system Alarm Manager
     final uniqueAlarmId = id.hashCode.abs(); 
 
     String? reminderIsoString;
@@ -103,18 +156,15 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
         _reminderTime!.minute,
       );
 
-      // If the selected time has already passed today, shift it safely to tomorrow
       if (targetDateTime.isBefore(now)) {
         targetDateTime = targetDateTime.add(const Duration(days: 1));
       }
 
       reminderIsoString = targetDateTime.toIso8601String();
-
-      // Trigger your Alarm Service engine tracking hook
       await AlarmService.setAlarm(uniqueAlarmId, targetDateTime);
     }
 
-    // Save payload structure to local Hive database
+    // Save configuration parameters payload securely to local database
     await habitsBox.put(id, {
       'id': id,
       'alarmId': uniqueAlarmId,
@@ -122,20 +172,11 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       'iconKey': iconKey,
       'createdAt': DateTime.now().toIso8601String(),
       'schedule': 'daily',
-      'reminderTime': reminderIsoString, // Will store null if user did not pick an alarm
+      'reminderTime': reminderIsoString,
+      'customTonePath': _selectedAudioPath, 
     });
 
     if (!mounted) return;
-    
-    if (_reminderTime != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('"$name" saved with alarm at ${_reminderTime!.format(context)}'),
-          backgroundColor: const Color(0xFF1976D2),
-        ),
-      );
-    }
-    
     context.pop();
   }
 
@@ -200,17 +241,35 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             const Text('Reminders', style: TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
             AlarmSettingWidget(
               selectedTime: _reminderTime,
-              onTimePicked: (time) {
-                setState(() {
-                  _reminderTime = time;
-                });
-              },
+              onTimePicked: (time) => setState(() => _reminderTime = time),
+            ),
+            const SizedBox(height: 12),
+
+            const Text('Alarm Tone From Gallery', style: TextStyle(fontWeight: FontWeight.w700)),
+            Card(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.grey.shade300),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.music_note, color: Color(0xFF1976D2)),
+                title: Text(
+                  _selectedAudioName ?? 'Default Ringtone',
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: TextButton(
+                  onPressed: _pickAudioTone,
+                  child: const Text('Browse'),
+                ),
+              ),
             ),
 
             const Spacer(),
@@ -221,12 +280,10 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1976D2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 onPressed: _save,
-                child: const Text('Save Habit', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                child: const Text('Save Habit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
